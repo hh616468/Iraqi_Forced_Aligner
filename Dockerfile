@@ -72,11 +72,11 @@ RUN mkdir -p /cache/torch /cache/huggingface
 # Preload the MMS model for forced alignment
 RUN python -c "from ctc_forced_aligner import load_alignment_model; import torch; device = 'cuda' if torch.cuda.is_available() else 'cpu'; load_alignment_model(device, model_path='${MMS_MODEL}', dtype=torch.float16 if device == 'cuda' else torch.float32)"
 
+# Copy the application code
+COPY src/ /app/
+
 # Create temp directory for processing
 RUN mkdir -p /app/tmp
-
-# Copy the handler
-COPY handler.py /app/handler.py
 
 # Set Stop signal and CMD
 STOPSIGNAL SIGINT
