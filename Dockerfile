@@ -1,81 +1,95 @@
-# Build stage
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04 AS builder
+# Use the updated base CUDA image
+FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu20.04
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# Set Work Directory
 WORKDIR /app
 
+# ARGs and ENVs
+ARG MMS_MODEL=facebook/mms-1b-all
+ARG TORCH_HOME=/cache/torch
+ARG HF_HOME=/cache/huggingface
+
+# Environment variables
+ENV TORCH_HOME=${TORCH_HOME}
+ENV HF_HOME=${HF_HOME}
+ENV MMS_MODEL=${MMS_MODEL}
+
+# Set LD_LIBRARY_PATH for library location (if still necessary)
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/
+ENV SHELL=/bin/bash
+ENV PYTHONUNBUFFERED=True
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install build dependencies
+# Update, upgrade, install packages and clean up
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
+    # Basic Utilities
+    bash ca-certificates curl file git ffmpeg \
+    # Build tools for compiling Python packages
     build-essential gcc g++ make cmake \
-    software-properties-common \
-    git curl && \
+    # Python 3.10 and development headers
+    software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
-    apt-get install -y python3.10 python3.10-venv python3.10-dev && \
+    apt-get install -y python3.10 python3.10-venv python3.10-distutils python3.10-dev && \
+    # Audio libraries
+    apt-get install -y libsndfile1-dev libsox-fmt-all sox && \
+    apt-get autoremove -y && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* && \
+    # Set locale
+    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
 
-# Create virtual environment
+# Create and activate virtual environment
 RUN python3.10 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
-# Upgrade pip and install build tools
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
-    setuptools wheel Cython pybind11 setuptools-rust
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
 
-# Install PyTorch
+# Install build tools and Cython first
+RUN pip install --no-cache-dir \
+    setuptools \
+    wheel \
+    Cython \
+    setuptools-rust \
+    pybind11 \
+    runpod==1.6.2
+
+# Install PyTorch packages (compatible with CUDA 11.8)
 RUN pip install --no-cache-dir \
     torch==2.0.1+cu118 \
     torchvision==0.15.2+cu118 \
     torchaudio==2.0.2+cu118 \
     --index-url https://download.pytorch.org/whl/cu118
 
-# Install requirements
+# Install numpy and other core dependencies first
+RUN pip install --no-cache-dir \
+    numpy==1.24.3 \
+    scipy==1.10.1
+
+# Copy and install application-specific requirements
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install CTC Forced Aligner
-RUN pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git
+# Install CTC Forced Aligner (with verbose output for debugging)
+RUN pip install --no-cache-dir --verbose git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git
 
-# Runtime stage
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu20.04
+# Create cache directories
+RUN mkdir -p /cache/torch /cache/huggingface
 
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-WORKDIR /app
+# Preload the MMS model for forced alignment
+RUN python -c "from ctc_forced_aligner import load_alignment_model; import torch; device = 'cuda' if torch.cuda.is_available() else 'cpu'; load_alignment_model(device, model_path='${MMS_MODEL}', dtype=torch.float16 if device == 'cuda' else torch.float32)"
 
-ENV DEBIAN_FRONTEND=noninteractive
-ENV PYTHONUNBUFFERED=True
-ENV PATH="/app/venv/bin:$PATH"
+# Create temp directory for processing
+RUN mkdir -p /app/tmp
 
-# Install only runtime dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    software-properties-common && \
-    add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get update && \
-    apt-get install -y python3.10 ffmpeg libsndfile1 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy the virtual environment from builder
-COPY --from=builder /app/venv /app/venv
-
-# Create directories
-RUN mkdir -p /cache/torch /cache/huggingface /app/tmp
-
-# Environment variables
-ENV TORCH_HOME=/cache/torch
-ENV HF_HOME=/cache/huggingface
-
-# Preload model
-RUN python -c "from ctc_forced_aligner import load_alignment_model; import torch; device = 'cuda' if torch.cuda.is_available() else 'cpu'; load_alignment_model(device, model_path='facebook/mms-1b-all', dtype=torch.float16 if device == 'cuda' else torch.float32)"
-
-# Copy handler
+# Copy the handler
 COPY handler.py /app/handler.py
 
+# Set Stop signal and CMD
 STOPSIGNAL SIGINT
 CMD ["python", "-u", "handler.py"]
