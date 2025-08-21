@@ -14,6 +14,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # System dependencies: Install all in one layer for efficiency
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        # >>> ADD THIS PACKAGE <<<
+        build-essential \
         # Basic utilities
         git ffmpeg curl ca-certificates \
         # Python 3.10
@@ -40,7 +42,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
         torch==2.0.1+cu118 \
         torchvision==0.15.2+cu118 \
-        torchaudio==2.0.2+cu118 \
+        torchaudio==0.2.2+cu118 \
         --index-url https://download.pytorch.org/whl/cu118 && \
     pip install --no-cache-dir -r requirements.txt && \
     # Install the git package separately
