@@ -44,20 +44,21 @@ RUN python3.10 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
 # Upgrade pip
-RUN pip install --no-cache-dir --upgrade pip==21.*
+RUN pip install --no-cache-dir --upgrade pip
 
-# Install setuptools-rust and other smaller packages
+# Install build tools
 RUN pip install --no-cache-dir \
-    setuptools-rust==1.8.0 \
-    huggingface_hub==0.18.0 \
-    runpod==1.3.0
+    setuptools \
+    wheel \
+    setuptools-rust \
+    runpod==1.6.2
 
 # Install PyTorch packages (compatible with CUDA 11.8)
 RUN pip install --no-cache-dir \
-    torch==2.0.0 \
-    torchvision==0.15.0 \
-    torchaudio==2.0.0 \
-    -f https://download.pytorch.org/whl/cu118/torch_stable.html
+    torch==2.0.1+cu118 \
+    torchvision==0.15.2+cu118 \
+    torchaudio==2.0.2+cu118 \
+    --index-url https://download.pytorch.org/whl/cu118
 
 # Copy and install application-specific requirements
 COPY requirements.txt /app/requirements.txt

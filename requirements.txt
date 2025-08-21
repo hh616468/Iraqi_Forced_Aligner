@@ -1,22 +1,27 @@
 # Core dependencies for CTC Forced Aligner
-transformers>=4.21.0
-datasets>=2.0.0
-librosa>=0.9.0
+transformers>=4.21.0,<5.0.0
+datasets>=2.0.0,<3.0.0
+librosa>=0.9.0,<1.0.0
 soundfile>=0.12.0
 jiwer>=2.5.0
-uroman>=1.2.8
-
-# Additional dependencies for text processing
-unicodedata2>=15.0.0
 num2words>=0.5.10
 
-# HTTP and serverless dependencies
+# Audio processing
+scipy>=1.9.0
+numpy>=1.21.0,<2.0.0
+
+# Text processing and romanization
+unidecode>=1.3.0
+regex>=2022.7.0
+
+# HTTP and serverless dependencies  
 requests>=2.28.0
-tempfile-dev>=0.1.0
+urllib3>=1.26.0
 
-# Optional dependencies for better performance
+# Performance optimization
 accelerate>=0.20.0
-torch-audiomentations>=0.11.0
+safetensors>=0.3.0
 
-# Development and debugging
+# Utilities
 tqdm>=4.64.0
+packaging>=21.0
