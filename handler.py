@@ -336,4 +336,8 @@ except Exception as e:
 
 # Start the serverless handler
 if __name__ == "__main__":
+<<<<<<< HEAD
     runpod.serverless.start({"handler": handler})
+=======
+    runpod.serverless.start({"handler": handler})
+>>>>>>> a02a1f0bb59ce73716d9dd9cd0f319d4b46983f0
