@@ -32,7 +32,8 @@ RUN apt-get update && \
     software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
-    apt-get install -y python3.10 python3.10-venv python3.10-distutils python3.10-dev && \
+    # To this:
+    apt-get install -y python3.11 python3.11-venv python3.11-distutils python3.11-dev && \
     # Audio libraries
     apt-get install -y libsndfile1-dev && \
     # Clean up apt cache
@@ -40,17 +41,17 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Create and activate virtual environment
-RUN python3.10 -m venv /app/venv
+RUN python3.11 -m venv /app/venv
 ENV PATH="/app/venv/bin:$PATH"
 
 # Install pip and upgrade it
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3.10 get-pip.py && \
+    python3.11 get-pip.py && \
     rm get-pip.py && \
-    python3.10 -m pip install --no-cache-dir --upgrade pip
+    python3.11 -m pip install --no-cache-dir --upgrade pip
 
 # Install build dependencies
-RUN python3.10 -m pip install --no-cache-dir \
+RUN python3.11 -m pip install --no-cache-dir \
     setuptools \
     wheel \
     Cython \
@@ -58,19 +59,19 @@ RUN python3.10 -m pip install --no-cache-dir \
     setuptools-rust
 
 # Install PyTorch with CUDA 11.8 support (matching your working environment)
-RUN python3.10 -m pip install --no-cache-dir \
+RUN python3.11 -m pip install --no-cache-dir \
     torch==2.7.1+cu118 \
     torchvision==0.22.1+cu118 \
     torchaudio==2.7.1+cu118 \
     --index-url https://download.pytorch.org/whl/cu118
 
 # Install core scientific packages (matching your working versions)
-RUN python3.10 -m pip install --no-cache-dir \
+RUN python3.11 -m pip install --no-cache-dir \
     numpy==2.1.2 \
     scipy==1.16.1
 
 # Install application requirements (matching your working versions)
-RUN python3.10 -m pip install --no-cache-dir \
+RUN python3.11 -m pip install --no-cache-dir \
     transformers==4.55.2 \
     librosa==0.11.0 \
     soundfile==0.13.1 \
@@ -87,10 +88,10 @@ RUN python3.10 -m pip install --no-cache-dir \
     regex==2025.7.34
 
 # Install CTC Forced Aligner
-RUN python3.10 -m pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git
+RUN python3.11 -m pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git
 
 # Clean pip cache to save space
-RUN python3.10 -m pip cache purge
+RUN python3.11 -m pip cache purge
 
 # Create directories
 RUN mkdir -p /cache/torch /cache/huggingface /app/tmp
@@ -99,11 +100,11 @@ RUN mkdir -p /cache/torch /cache/huggingface /app/tmp
 COPY handler.py /app/handler.py
 
 # Test the installation works
-RUN python3.10 -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" && \
-    python3.10 -c "from ctc_forced_aligner import load_alignment_model; print('CTC Forced Aligner imported successfully')" && \
-    python3.10 -c "import transformers; print(f'Transformers version: {transformers.__version__}')" && \
+RUN python3.11 -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" && \
+    python3.11 -c "from ctc_forced_aligner import load_alignment_model; print('CTC Forced Aligner imported successfully')" && \
+    python3.11 -c "import transformers; print(f'Transformers version: {transformers.__version__}')" && \
     echo "All imports successful!"
 
 # Set Stop signal and CMD
 STOPSIGNAL SIGINT
-CMD ["python3.10", "-u", "handler.py"]
+CMD ["python3.11", "-u", "handler.py"]
