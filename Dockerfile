@@ -81,3 +81,5 @@ COPY handler.py /app/handler.py
 # Set Stop signal and CMD
 STOPSIGNAL SIGINT
 CMD ["python", "-u", "handler.py"]
+
+
