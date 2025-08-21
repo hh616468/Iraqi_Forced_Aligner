@@ -1,5 +1,5 @@
-# Use the updated base CUDA image
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu20.04
+# Use the updated base CUDA image with development tools
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
@@ -15,33 +15,74 @@ ARG HF_HOME=/cache/huggingface
 ENV TORCH_HOME=${TORCH_HOME}
 ENV HF_HOME=${HF_HOME}
 ENV MMS_MODEL=${MMS_MODEL}
-
-# Set LD_LIBRARY_PATH for library location (if still necessary)
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/
 ENV SHELL=/bin/bash
 ENV PYTHONUNBUFFERED=True
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update, upgrade, install packages and clean up
+# Update, upgrade, install packages and clean up in one layer
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
     # Basic Utilities
     bash ca-certificates curl file git ffmpeg \
-    # Build tools for compiling Python packages
+    # Build tools (temporarily needed)
     build-essential gcc g++ make cmake \
     # Python 3.10 and development headers
     software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
-    apt-get install -y python3.10 python3.10-venv python3.10-distutils python3.10-dev && \
+    apt-get install -y python3.10 python3.10-venv python3.10-distutils python3.10-dev python3.10-pip && \
     # Audio libraries
-    apt-get install -y libsndfile1-dev libsox-fmt-all sox && \
-    apt-get autoremove -y && \
+    apt-get install -y libsndfile1-dev && \
+    # Create virtual environment
+    python3.10 -m venv /app/venv && \
+    # Clean up apt cache
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    # Set locale
-    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
+    rm -rf /var/lib/apt/lists/*
+
+# Activate virtual environment
+ENV PATH="/app/venv/bin:$PATH"
+
+# Install everything in one RUN command to minimize layers
+RUN pip install --no-cache-dir --upgrade pip && \
+    # Install build dependencies
+    pip install --no-cache-dir setuptools wheel Cython pybind11 setuptools-rust && \
+    # Install PyTorch
+    pip install --no-cache-dir \
+        torch==2.0.1+cu118 \
+        torchvision==0.15.2+cu118 \
+        torchaudio==2.0.2+cu118 \
+        --index-url https://download.pytorch.org/whl/cu118 && \
+    # Install core dependencies
+    pip install --no-cache-dir numpy==1.24.3 scipy==1.10.1 && \
+    # Install application requirements
+    pip install --no-cache-dir \
+        transformers>=4.21.0,<5.0.0 \
+        librosa>=0.9.0,<1.0.0 \
+        soundfile>=0.12.0 \
+        requests>=2.28.0 \
+        runpod==1.6.2 \
+        tqdm>=4.64.0 && \
+    # Install CTC Forced Aligner
+    pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git && \
+    # Clean pip cache to save space
+    pip cache purge
+
+# Create directories
+RUN mkdir -p /cache/torch /cache/huggingface /app/tmp
+
+# Copy handler first (so we can test the build without model preloading)
+COPY handler.py /app/handler.py
+
+# Test the installation works
+RUN python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" && \
+    python -c "from ctc_forced_aligner import load_alignment_model; print('CTC Forced Aligner imported successfully')" && \
+    echo "All imports successful!"
+
+# Set Stop signal and CMD
+STOPSIGNAL SIGINT
+CMD ["python", "-u", "handler.py"]_US.UTF-8 UTF-8" > /etc/locale.gen
 
 # Create and activate virtual environment
 RUN python3.10 -m venv /app/venv
