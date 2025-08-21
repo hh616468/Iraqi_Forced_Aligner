@@ -1,0 +1,48 @@
+1
+00:00:00,429 --> 00:00:01,090
+Do you see this?
+
+2
+00:00:01,250 --> 00:00:02,011
+What's happening here?
+
+3
+00:00:02,271 --> 00:00:06,615
+That's a hint that the photo finish system at the Olympics isn't actually giving us a photo.
+
+4
+00:00:06,855 --> 00:00:08,016
+And that's why it looks a little weird.
+
+5
+00:00:08,437 --> 00:00:15,563
+So these two runners, Kashane Thompson and Noah Lyles, both finished the hundred meter race with an official time of nine point seven nine seconds.
+
+6
+00:00:15,904 --> 00:00:22,270
+The announcer had called it for Thompson, but it turned out his torso crossed that line five thousandths of a second after Lyles.
+
+7
+00:00:22,870 --> 00:00:23,551
+How do they know that?
+
+8
+00:00:23,771 --> 00:00:30,456
+Well, Omega, which is the official timekeeper for the Olympics, has a finish line camera that can capture forty thousand frames per second.
+
+9
+00:00:30,617 --> 00:00:33,459
+But instead of a normal camera, it scans one vertical slice.
+
+10
+00:00:33,699 --> 00:00:43,047
+So this photo finish picture isn't capturing a moment in time, it's capturing a place, the finish line, and what each body part of each runner looked like as they were crossing it.
+
+11
+00:00:43,267 --> 00:00:50,033
+Those vertical slices are then spread out horizontally by their time code so that the operator can mark their chests with a red line.
+
+12
+00:00:50,333 --> 00:00:57,382
+The ground is white because this camera is only capturing the finish line, and the logos come from a billboard that only the finish line camera can read.
+

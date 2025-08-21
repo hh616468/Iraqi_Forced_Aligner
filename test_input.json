@@ -1,0 +1,9 @@
+{
+  "input": {
+    "audio": "https://example.com/audio.mp3",
+    "text": "https://example.com/transcript.txt",
+    "language": "ara",
+    "batch_size": 16,
+    "output_format": "both"
+  }
+}
