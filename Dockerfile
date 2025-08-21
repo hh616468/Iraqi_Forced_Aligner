@@ -32,7 +32,7 @@ RUN apt-get update && \
     software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
-    apt-get install -y python3.10 python3.10-venv python3.10-distutils python3.10-dev python3.10-pip && \
+    apt-get install -y python3.10 python3.10-venv python3.10-distutils python3.10-dev && \
     # Audio libraries
     apt-get install -y libsndfile1-dev && \
     # Create virtual environment
@@ -45,19 +45,23 @@ RUN apt-get update && \
 ENV PATH="/app/venv/bin:$PATH"
 
 # Install everything in one RUN command to minimize layers
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python3.10 get-pip.py && \
+    rm get-pip.py && \
+    # Upgrade pip
+    python3.10 -m pip install --no-cache-dir --upgrade pip && \
     # Install build dependencies
-    pip install --no-cache-dir setuptools wheel Cython pybind11 setuptools-rust && \
+    python3.10 -m pip install --no-cache-dir setuptools wheel Cython pybind11 setuptools-rust && \
     # Install PyTorch
-    pip install --no-cache-dir \
+    python3.10 -m pip install --no-cache-dir \
         torch==2.0.1+cu118 \
         torchvision==0.15.2+cu118 \
         torchaudio==2.0.2+cu118 \
         --index-url https://download.pytorch.org/whl/cu118 && \
     # Install core dependencies
-    pip install --no-cache-dir numpy==1.24.3 scipy==1.10.1 && \
+    python3.10 -m pip install --no-cache-dir numpy==1.24.3 scipy==1.10.1 && \
     # Install application requirements
-    pip install --no-cache-dir \
+    python3.10 -m pip install --no-cache-dir \
         transformers>=4.21.0,<5.0.0 \
         librosa>=0.9.0,<1.0.0 \
         soundfile>=0.12.0 \
@@ -65,9 +69,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
         runpod==1.6.2 \
         tqdm>=4.64.0 && \
     # Install CTC Forced Aligner
-    pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git && \
+    python3.10 -m pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git && \
     # Clean pip cache to save space
-    pip cache purge
+    python3.10 -m pip cache purge
 
 # Create directories
 RUN mkdir -p /cache/torch /cache/huggingface /app/tmp
@@ -76,13 +80,13 @@ RUN mkdir -p /cache/torch /cache/huggingface /app/tmp
 COPY handler.py /app/handler.py
 
 # Test the installation works
-RUN python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" && \
-    python -c "from ctc_forced_aligner import load_alignment_model; print('CTC Forced Aligner imported successfully')" && \
+RUN python3.10 -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" && \
+    python3.10 -c "from ctc_forced_aligner import load_alignment_model; print('CTC Forced Aligner imported successfully')" && \
     echo "All imports successful!"
 
 # Set Stop signal and CMD
 STOPSIGNAL SIGINT
-CMD ["python", "-u", "handler.py"]_US.UTF-8 UTF-8" > /etc/locale.gen
+CMD ["python3.10", "-u", "handler.py"]_US.UTF-8 UTF-8" > /etc/locale.gen
 
 # Create and activate virtual environment
 RUN python3.10 -m venv /app/venv
