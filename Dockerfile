@@ -1,140 +1,61 @@
-# Use the updated base CUDA image with development tools
+# Use the official NVIDIA CUDA base image
 FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
 
+# Set shell to fail on errors
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Set Work Directory
-WORKDIR /app
+# Set environment variables to avoid prompts during build
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=True \
+    PATH="/app/venv/bin:$PATH" \
+    TORCH_HOME=/cache/torch \
+    HF_HOME=/cache/huggingface
 
-# ARGs and ENVs
-ARG MMS_MODEL=facebook/mms-1b-all
-ARG TORCH_HOME=/cache/torch
-ARG HF_HOME=/cache/huggingface
-
-# Environment variables
-ENV TORCH_HOME=${TORCH_HOME}
-ENV HF_HOME=${HF_HOME}
-ENV MMS_MODEL=${MMS_MODEL}
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/x86_64-linux-gnu/
-ENV SHELL=/bin/bash
-ENV PYTHONUNBUFFERED=True
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Update, upgrade, install packages and clean up in one layer
+# System dependencies: Install all in one layer for efficiency
 RUN apt-get update && \
-    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
-    # Basic Utilities
-    bash ca-certificates curl file git ffmpeg \
-    # Build tools (temporarily needed)
-    build-essential gcc g++ make cmake \
-    # Python 3.10 and development headers
-    software-properties-common && \
+        # Basic utilities
+        git ffmpeg curl ca-certificates \
+        # Python 3.10
+        software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
     apt-get update && \
-    apt-get install -y python3.10 python3.10-venv python3.10-distutils python3.10-dev && \
-    # Audio libraries
+    apt-get install -y python3.10 python3.10-venv python3.10-distutils && \
+    # Audio library dependency
     apt-get install -y libsndfile1-dev && \
-    # Create virtual environment
-    python3.10 -m venv /app/venv && \
-    # Clean up apt cache
+    # Clean up to reduce image size
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Activate virtual environment
-ENV PATH="/app/venv/bin:$PATH"
+# Set up the application directory and virtual environment
+WORKDIR /app
+RUN python3.10 -m venv /app/venv
 
-# Install everything in one RUN command to minimize layers
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3.10 get-pip.py && \
-    rm get-pip.py && \
-    # Upgrade pip
-    python3.10 -m pip install --no-cache-dir --upgrade pip && \
-    # Install build dependencies
-    python3.10 -m pip install --no-cache-dir setuptools wheel Cython pybind11 setuptools-rust && \
-    # Install PyTorch
-    python3.10 -m pip install --no-cache-dir \
+# Copy requirements file before other files to leverage Docker caching
+COPY requirements.txt .
+
+# Install Python dependencies from requirements.txt
+# This is more manageable and better for caching
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
         torch==2.0.1+cu118 \
         torchvision==0.15.2+cu118 \
         torchaudio==2.0.2+cu118 \
         --index-url https://download.pytorch.org/whl/cu118 && \
-    # Install core dependencies
-    python3.10 -m pip install --no-cache-dir numpy==1.24.3 scipy==1.10.1 && \
-    # Install application requirements
-    python3.10 -m pip install --no-cache-dir \
-        transformers>=4.21.0,<5.0.0 \
-        librosa>=0.9.0,<1.0.0 \
-        soundfile>=0.12.0 \
-        requests>=2.28.0 \
-        runpod==1.6.2 \
-        tqdm>=4.64.0 && \
-    # Install CTC Forced Aligner
-    python3.10 -m pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git && \
-    # Clean pip cache to save space
-    python3.10 -m pip cache purge
+    pip install --no-cache-dir -r requirements.txt && \
+    # Install the git package separately
+    pip install --no-cache-dir git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git && \
+    # Clean pip cache
+    pip cache purge
 
-# Create directories
+# Create necessary directories
 RUN mkdir -p /cache/torch /cache/huggingface /app/tmp
 
-# Copy handler first (so we can test the build without model preloading)
-COPY handler.py /app/handler.py
+# Copy your application code
+COPY handler.py .
 
-# Test the installation works
-RUN python3.10 -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" && \
-    python3.10 -c "from ctc_forced_aligner import load_alignment_model; print('CTC Forced Aligner imported successfully')" && \
-    echo "All imports successful!"
+# Test the installation to ensure everything is working
+RUN python3.10 -c "import torch; print(f'PyTorch version: {torch.__version__}, CUDA available: {torch.cuda.is_available()}')"
 
-# Set Stop signal and CMD
-STOPSIGNAL SIGINT
-CMD ["python3.10", "-u", "handler.py"]_US.UTF-8 UTF-8" > /etc/locale.gen
-
-# Create and activate virtual environment
-RUN python3.10 -m venv /app/venv
-ENV PATH="/app/venv/bin:$PATH"
-
-# Upgrade pip
-RUN pip install --no-cache-dir --upgrade pip
-
-# Install build tools and Cython first
-RUN pip install --no-cache-dir \
-    setuptools \
-    wheel \
-    Cython \
-    setuptools-rust \
-    pybind11 \
-    runpod==1.6.2
-
-# Install PyTorch packages (compatible with CUDA 11.8)
-RUN pip install --no-cache-dir \
-    torch==2.0.1+cu118 \
-    torchvision==0.15.2+cu118 \
-    torchaudio==2.0.2+cu118 \
-    --index-url https://download.pytorch.org/whl/cu118
-
-# Install numpy and other core dependencies first
-RUN pip install --no-cache-dir \
-    numpy==1.24.3 \
-    scipy==1.10.1
-
-# Copy and install application-specific requirements
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Install CTC Forced Aligner (with verbose output for debugging)
-RUN pip install --no-cache-dir --verbose git+https://github.com/MahmoudAshraf97/ctc-forced-aligner.git
-
-# Create cache directories
-RUN mkdir -p /cache/torch /cache/huggingface
-
-# Preload the MMS model for forced alignment
-RUN python -c "from ctc_forced_aligner import load_alignment_model; import torch; device = 'cuda' if torch.cuda.is_available() else 'cpu'; load_alignment_model(device, model_path='${MMS_MODEL}', dtype=torch.float16 if device == 'cuda' else torch.float32)"
-
-# Create temp directory for processing
-RUN mkdir -p /app/tmp
-
-# Copy the handler
-COPY handler.py /app/handler.py
-
-# Set Stop signal and CMD
-STOPSIGNAL SIGINT
-CMD ["python", "-u", "handler.py"]
+# Set the final command to run your application
+CMD ["python3.10", "-u", "handler.py"]
